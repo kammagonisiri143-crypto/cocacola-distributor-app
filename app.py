@@ -15,7 +15,7 @@ st.markdown("""
 
 # ----------------- SESSION STATE INITIALIZATION -----------------
 if "users" not in st.session_state:
-    st.session_state.users = {"admin": "coke123"}  # Default credentials
+    st.session_state.users = {"admin": "coke123"}
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -23,7 +23,7 @@ if "authenticated" not in st.session_state:
 if "current_user" not in st.session_state:
     st.session_state.current_user = ""
 
-if "products" not in st.session_state:
+if "products" not in st.session_state or not isinstance(next(iter(st.session_state.products.values()), {}), dict):
     st.session_state.products = {
         "Coca-Cola 300ml Glass": {"case_price": 450.0, "bottles_per_case": 24},
         "Sprite 300ml Glass": {"case_price": 440.0, "bottles_per_case": 24},
@@ -112,6 +112,12 @@ else:
         with col1:
             selected_product = st.selectbox("Select Product", list(products.keys()))
             prod_info = products[selected_product]
+            
+            # Safeguard against old session state structures
+            if isinstance(prod_info, (int, float)):
+                prod_info = {"case_price": float(prod_info), "bottles_per_case": 24}
+                products[selected_product] = prod_info
+
             base_case_price = prod_info["case_price"]
             bottles_per_case = prod_info["bottles_per_case"]
             base_bottle_price = base_case_price / bottles_per_case
@@ -162,6 +168,10 @@ else:
         with tab1:
             st.subheader("Edit Current Product Prices & Packaging")
             for prod, info in list(st.session_state.products.items()):
+                if isinstance(info, (int, float)):
+                    info = {"case_price": float(info), "bottles_per_case": 24}
+                    st.session_state.products[prod] = info
+
                 with st.container():
                     col_a, col_b, col_c, col_d = st.columns([3, 2, 2, 1])
                     with col_a:
@@ -320,6 +330,10 @@ else:
                     add_to_cart_btn = st.form_submit_button("Add to Order Cart")
                     if add_to_cart_btn:
                         p_info = products[sel_product]
+                        if isinstance(p_info, (int, float)):
+                            p_info = {"case_price": float(p_info), "bottles_per_case": 24}
+                            products[sel_product] = p_info
+
                         base_price = p_info["case_price"]
                         bottles_per_case = p_info["bottles_per_case"]
 
