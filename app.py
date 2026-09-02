@@ -1,507 +1,83 @@
-from flask import Flask, render_template_string
+import streamlit as st
+import pandas as pd
 
-app = Flask(__name__)
+st.set_page_config(page_title="Coca-Cola Distributor Pricing Calculator", page_icon="🥤", layout="centered")
 
-HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Distributor App</title>
-
+# Custom styling for Coca-Cola branding aesthetic
+st.markdown("""
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background: #f4f4f4;
-            color: #222;
-        }
-
-        header {
-            background: #d71920;
-            color: white;
-            text-align: center;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 20px auto;
-            padding: 15px;
-        }
-
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        h2 {
-            margin-top: 0;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0 15px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 16px;
-        }
-
-        button {
-            background: #d71920;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
-        }
-
-        button:hover {
-            background: #b51218;
-        }
-
-        .add-btn {
-            background: #222;
-        }
-
-        .order-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f7f7f7;
-            padding: 12px;
-            margin-top: 10px;
-            border-radius: 8px;
-        }
-
-        .delete-btn {
-            background: #777;
-            padding: 8px 12px;
-            margin: 0;
-        }
-
-        .total {
-            font-size: 24px;
-            font-weight: bold;
-            color: #d71920;
-        }
-
-        .row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        @media (max-width: 600px) {
-            .row {
-                grid-template-columns: 1fr;
-            }
-        }
+    .main {
+        background-color: #f9f9f9;
+    }
+    .stButton>button {
+        background-color: #F40009;
+        color: white;
+        font-weight: bold;
+    }
     </style>
-</head>
+""", unsafe_allow_html=True)
 
-<body>
+st.title("🥤 Coca-Cola Distributor Order & Rate Calculator")
+st.write("Instant volume-based pricing calculator for retail and wholesale orders.")
 
-<header>
-    <h1>Distributor App</h1>
-    <p>Order & Case Price Calculator</p>
-</header>
-
-<div class="container">
-
-    <div class="card">
-        <h2>Customer Details</h2>
-
-        <input type="text" id="customerName" placeholder="Customer Name">
-
-        <input type="text" id="shopName" placeholder="Shop Name">
-
-        <input type="text" id="phone" placeholder="Phone Number">
-    </div>
-
-
-    <div class="card">
-        <h2>Add Product</h2>
-
-        <label>Product</label>
-
-        <select id="product" onchange="setRate()">
-            <option value="Coca-Cola">Coca-Cola</option>
-            <option value="Sprite">Sprite</option>
-            <option value="Fanta">Fanta</option>
-            <option value="Thums Up">Thums Up</option>
-            <option value="Maaza">Maaza</option>
-        </select>
-
-        <div class="row">
-
-            <div>
-                <label>Rate Per Case (₹)</label>
-                <input type="number" id="rate" value="500">
-            </div>
-
-            <div>
-                <label>Number of Cases</label>
-                <input type="number" id="quantity" value="1" min="1">
-            </div>
-
-        </div>
-
-        <button class="add-btn" onclick="addProduct()">
-            Add Product
-        </button>
-
-    </div>
-
-
-    <div class="card">
-
-        <h2>Order Items</h2>
-
-        <div id="orderItems">
-            No products added.
-        </div>
-
-    </div>
-
-
-    <div class="card">
-
-        <h2>Order Summary</h2>
-
-        <label>Discount (₹)</label>
-
-        <input
-            type="number"
-            id="discount"
-            value="0"
-            min="0"
-            oninput="calculateTotal()"
-        >
-
-        <p>
-            Subtotal:
-            <strong>₹<span id="subtotal">0</span></strong>
-        </p>
-
-        <p>
-            Discount:
-            <strong>₹<span id="discountDisplay">0</span></strong>
-        </p>
-
-        <hr>
-
-        <p class="total">
-            Final Total: ₹<span id="finalTotal">0</span>
-        </p>
-
-        <button onclick="generateOrder()">
-            Generate Order
-        </button>
-
-    </div>
-
-
-    <div class="card" id="invoice" style="display:none;">
-
-        <h2>Order Invoice</h2>
-
-        <p>
-            <strong>Customer:</strong>
-            <span id="invoiceCustomer"></span>
-        </p>
-
-        <p>
-            <strong>Shop:</strong>
-            <span id="invoiceShop"></span>
-        </p>
-
-        <p>
-            <strong>Phone:</strong>
-            <span id="invoicePhone"></span>
-        </p>
-
-        <hr>
-
-        <div id="invoiceItems"></div>
-
-        <hr>
-
-        <h2>
-            Total: ₹<span id="invoiceTotal"></span>
-        </h2>
-
-        <button onclick="window.print()">
-            Print Invoice
-        </button>
-
-    </div>
-
-</div>
-
-
-<script>
-
-let products = {
-
-    "Coca-Cola": 500,
-    "Sprite": 480,
-    "Fanta": 470,
-    "Thums Up": 500,
-    "Maaza": 450
-
-};
-
-
-let order = [];
-
-
-function setRate() {
-
-    let product =
-        document.getElementById("product").value;
-
-    document.getElementById("rate").value =
-        products[product];
-
+# Product Catalog with base prices per case (₹)
+products = {
+    "Coca-Cola 300ml Glass (24 bottles)": 450.0,
+    "Sprite 300ml Glass (24 bottles)": 440.0,
+    "Thums Up 300ml Glass (24 bottles)": 450.0,
+    "Minute Maid Orange 1L (12 bottles)": 720.0,
+    "Kinley Soda 600ml (24 bottles)": 300.0
 }
 
+col1, col2 = st.columns(2)
 
-function addProduct() {
+with col1:
+    selected_product = st.selectbox("Select Product", list(products.keys()))
+    base_price = products[selected_product]
+    st.info(f"Base Rate (1 Case): ₹{base_price:.2f}")
 
-    let product =
-        document.getElementById("product").value;
+with col2:
+    cases = st.number_input("Enter Number of Cases", min_value=1, max_value=10000, value=1, step=1)
 
-    let rate =
-        Number(document.getElementById("rate").value);
+# Tiered Pricing Logic
+def calculate_rate(cases, base_price):
+    if cases >= 100:
+        discount = 0.10  # 10% discount for 100+ cases
+        tier_name = "Bulk Tier (100+ Cases - 10% Off)"
+    elif cases >= 50:
+        discount = 0.07  # 7% discount for 50-99 cases
+        tier_name = "Wholesale Tier (50-99 Cases - 7% Off)"
+    elif cases >= 10:
+        discount = 0.04  # 4% discount for 10-49 cases
+        tier_name = "Dealer Tier (10-49 Cases - 4% Off)"
+    else:
+        discount = 0.0   # Standard retail rate for 1-9 cases
+        tier_name = "Standard Tier (1-9 Cases)"
+    
+    discounted_rate = base_price * (1 - discount)
+    total_amount = discounted_rate * cases
+    return discounted_rate, total_amount, tier_name, discount * 100
 
-    let quantity =
-        Number(document.getElementById("quantity").value);
+unit_rate, total_amount, tier_name, discount_pct = calculate_rate(cases, base_price)
 
+st.markdown("---")
+st.subheader("📊 Order Summary")
 
-    if (quantity <= 0 || rate < 0) {
+m1, m2, m3 = st.columns(3)
+m1.metric("Applied Tier", tier_name)
+m2.metric("Rate Per Case", f"₹{unit_rate:.2f}", delta=f"-{discount_pct}%" if discount_pct > 0 else None)
+m3.metric("Total Order Value", f"₹{total_amount:,.2f}")
 
-        alert("Please enter valid values.");
-
-        return;
-
+# Quick Reference Table for Volume Discount Tiers
+with st.expander("View Volume Discount Tiers for Selected Product"):
+    tier_data = {
+        "Quantity Range": ["1 - 9 Cases", "10 - 49 Cases", "50 - 99 Cases", "100+ Cases"],
+        "Discount": ["0% (Base Price)", "4%", "7%", "10%"],
+        "Effective Rate per Case": [
+            f"₹{base_price:.2f}", 
+            f"₹{base_price * 0.96:.2f}", 
+            f"₹{base_price * 0.93:.2f}", 
+            f"₹{base_price * 0.90:.2f}"
+        ]
     }
-
-
-    let total =
-        rate * quantity;
-
-
-    order.push({
-
-        product: product,
-        rate: rate,
-        quantity: quantity,
-        total: total
-
-    });
-
-
-    displayOrder();
-
-    calculateTotal();
-
-}
-
-
-function displayOrder() {
-
-    let container =
-        document.getElementById("orderItems");
-
-
-    if (order.length === 0) {
-
-        container.innerHTML =
-            "No products added.";
-
-        return;
-
-    }
-
-
-    container.innerHTML = "";
-
-
-    order.forEach(function(item, index) {
-
-        container.innerHTML += `
-
-        <div class="order-item">
-
-            <div>
-
-                <strong>${item.product}</strong>
-
-                <br>
-
-                ${item.quantity} Cases × ₹${item.rate}
-
-                = ₹${item.total}
-
-            </div>
-
-
-            <button
-                class="delete-btn"
-                onclick="removeProduct(${index})">
-
-                Remove
-
-            </button>
-
-        </div>
-
-        `;
-
-    });
-
-}
-
-
-function removeProduct(index) {
-
-    order.splice(index, 1);
-
-    displayOrder();
-
-    calculateTotal();
-
-}
-
-
-function calculateTotal() {
-
-    let subtotal = 0;
-
-
-    order.forEach(function(item) {
-
-        subtotal += item.total;
-
-    });
-
-
-    let discount =
-        Number(
-            document.getElementById("discount").value
-        );
-
-
-    let finalTotal =
-        subtotal - discount;
-
-
-    if (finalTotal < 0) {
-
-        finalTotal = 0;
-
-    }
-
-
-    document.getElementById("subtotal")
-        .innerText = subtotal;
-
-
-    document.getElementById("discountDisplay")
-        .innerText = discount;
-
-
-    document.getElementById("finalTotal")
-        .innerText = finalTotal;
-
-}
-
-
-function generateOrder() {
-
-    if (order.length === 0) {
-
-        alert("Please add at least one product.");
-
-        return;
-
-    }
-
-
-    document.getElementById("invoice")
-        .style.display = "block";
-
-
-    document.getElementById("invoiceCustomer")
-        .innerText =
-        document.getElementById("customerName").value;
-
-
-    document.getElementById("invoiceShop")
-        .innerText =
-        document.getElementById("shopName").value;
-
-
-    document.getElementById("invoicePhone")
-        .innerText =
-        document.getElementById("phone").value;
-
-
-    let invoiceItems =
-        document.getElementById("invoiceItems");
-
-
-    invoiceItems.innerHTML = "";
-
-
-    order.forEach(function(item) {
-
-        invoiceItems.innerHTML += `
-
-        <p>
-
-            <strong>${item.product}</strong>
-
-            <br>
-
-            ${item.quantity} Cases × ₹${item.rate}
-
-            = ₹${item.total}
-
-        </p>
-
-        `;
-
-    });
-
-
-    document.getElementById("invoiceTotal")
-        .innerText =
-        document.getElementById("finalTotal").innerText;
-
-}
-
-</script>
-
-</body>
-</html>
-"""
-
-
-@app.route("/")
-def home():
-    return render_template_string(HTML)
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
+    st.table(pd.DataFrame(tier_data))
